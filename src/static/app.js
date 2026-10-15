@@ -4,6 +4,45 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  function createParticipantRow(activity, email) {
+    const participant = document.createElement("li");
+    participant.className = "participant-row";
+
+    const participantEmail = document.createElement("span");
+    participantEmail.textContent = email;
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "remove-participant";
+    removeButton.dataset.activity = activity;
+    removeButton.dataset.email = email;
+    removeButton.setAttribute("aria-label", `Unregister ${email} from ${activity}`);
+    removeButton.title = "Unregister participant";
+    removeButton.textContent = "🗑️";
+
+    participant.append(participantEmail, removeButton);
+    return participant;
+  }
+
+  function updateActivityCard(activity, details) {
+    const card = Array.from(activitiesList.querySelectorAll(".activity-card"))
+      .find((candidate) => candidate.dataset.activity === activity);
+
+    if (!card) {
+      fetchActivities();
+      return;
+    }
+
+    const spotsLeft = details.max_participants - details.participants.length;
+    card.querySelector(".activity-availability").textContent =
+      `Availability: ${spotsLeft} spots left`;
+
+    const participantsList = card.querySelector(".participant-list");
+    participantsList.replaceChildren(
+      ...details.participants.map((email) => createParticipantRow(activity, email))
+    );
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -18,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
       Object.entries(activities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
+        activityCard.dataset.activity = name;
 
         const spotsLeft = details.max_participants - details.participants.length;
 
@@ -25,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p class="activity-availability"><strong>Availability:</strong> ${spotsLeft} spots left</p>
         `;
 
         const participantsHeading = document.createElement("h5");
@@ -35,23 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const participantsList = document.createElement("ul");
         participantsList.className = "participant-list";
         details.participants.forEach((email) => {
-          const participant = document.createElement("li");
-          participant.className = "participant-row";
-
-          const participantEmail = document.createElement("span");
-          participantEmail.textContent = email;
-
-          const removeButton = document.createElement("button");
-          removeButton.type = "button";
-          removeButton.className = "remove-participant";
-          removeButton.dataset.activity = name;
-          removeButton.dataset.email = email;
-          removeButton.setAttribute("aria-label", `Unregister ${email} from ${name}`);
-          removeButton.title = "Unregister participant";
-          removeButton.textContent = "🗑️";
-
-          participant.append(participantEmail, removeButton);
-          participantsList.appendChild(participant);
+          participantsList.appendChild(createParticipantRow(name, email));
         });
         activityCard.append(participantsHeading, participantsList);
 
@@ -89,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(result.detail || "Could not unregister participant");
       }
 
-      await fetchActivities();
+      updateActivityCard(activity, result.activity);
     } catch (error) {
       messageDiv.textContent = error.message || "Could not unregister participant";
       messageDiv.className = "error";
@@ -119,7 +143,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
-        await fetchActivities();
+        updateActivityCard(activity, result.activity);
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
